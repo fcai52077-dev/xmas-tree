@@ -17,7 +17,7 @@
       radial-gradient(120% 78% at 50% 70%, #0c1c26 0%, #081119 36%, #04080d 66%, #010204 100%),
       #010204;
     color: #dfe7ee;
-    font-family: 'Cormorant Garamond', 'EB Garamond', Georgia, 'Times New Roman', serif;
+    font-family: 'Cormorant Garamond', 'EB Garamond', 'Songti SC', 'Source Han Serif SC', 'Noto Serif SC', Georgia, 'Times New Roman', serif;
     -webkit-font-smoothing: antialiased;
   }
   #scene { position: fixed; inset: 0; display: block; width: 100%; height: 100%; }
@@ -45,14 +45,6 @@
     text-shadow: 0 0 18px rgba(214, 231, 245, .32);
     white-space: nowrap;
   }
-  .sign {
-    position: fixed; right: clamp(18px, 3vw, 44px); bottom: clamp(16px, 3vh, 36px);
-    font-size: clamp(14px, 1.5vw, 21px);
-    letter-spacing: .16em;
-    color: #e3ebf3;
-    text-shadow: 0 0 16px rgba(214, 231, 245, .3);
-    pointer-events: none;
-  }
   .hint {
     position: fixed; left: 0; right: 0; bottom: clamp(12px, 2.4vh, 26px);
     text-align: center;
@@ -64,12 +56,11 @@
   }
 
   /* text is visible by default; only a JS-enabled page fades it in */
-  html.js h1, html.js .to, html.js .sign, html.js .hint { opacity: 0; }
+  html.js h1, html.js .to, html.js .hint { opacity: 0; }
   html.js h1 { transform: translateY(-10px); transition: opacity 1.8s ease, transform 1.8s ease; }
   html.js .to { transform: translateY(-6px); transition: opacity 1.6s ease .1s, transform 1.6s ease .1s; }
-  html.js .sign { transition: opacity 1.6s ease; }
   html.js .hint { transition: opacity 2s ease; }
-  html.js h1.on, html.js .to.on, html.js .sign.on, html.js .hint.on { opacity: 1; transform: none; }
+  html.js h1.on, html.js .to.on, html.js .hint.on { opacity: 1; transform: none; }
 
   .noscript {
     position: fixed; left: 0; right: 0; bottom: clamp(56px, 9vh, 96px);
@@ -81,7 +72,6 @@
 
   @media (max-width: 560px) {
     .hint { font-size: 9px; letter-spacing: .16em; }
-    .sign { bottom: calc(clamp(16px, 3vh, 36px) + 20px); font-size: 15px; }
   }
 </style>
 </head>
@@ -90,9 +80,8 @@
 
 <div class="ui">
   <h1 id="title">Merry Christmas</h1>
-  <div class="to" id="to">To: xxx</div>
+  <div class="to" id="to">To: 谦谦</div>
 </div>
-<div class="sign" id="sign">-xxx</div>
 <div class="hint" id="hint">move your cursor to spin the christmas tree</div>
 
 <noscript>
@@ -113,7 +102,6 @@
   var ctx = canvas.getContext("2d");
   var titleEl = document.getElementById("title");
   var toEl = document.getElementById("to");
-  var signEl = document.getElementById("sign");
   var hintEl = document.getElementById("hint");
 
   function clamp01(v) { return v < 0 ? 0 : v > 1 ? 1 : v; }
@@ -496,7 +484,6 @@
 
     window.setTimeout(function () { titleEl.classList.add("on"); }, 1400);
     window.setTimeout(function () { toEl.classList.add("on"); }, 2200);
-    window.setTimeout(function () { signEl.classList.add("on"); }, 2900);
     window.setTimeout(function () { hintEl.classList.add("on"); }, 3450);
   }
 
