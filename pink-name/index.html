@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark">
+<title>Merry Christmas</title>
+<script>document.documentElement.className += " js";</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
+<style>
+  html, body { height: 100%; margin: 0; }
+  body {
+    overflow: hidden;
+    background:
+      radial-gradient(120% 78% at 50% 70%, #1b0f19 0%, #120a11 36%, #07050a 66%, #020103 100%),
+      #020103;
+    color: #dfe7ee;
+    font-family: 'Cormorant Garamond', 'EB Garamond', 'Songti SC', 'Source Han Serif SC', 'Noto Serif SC', Georgia, 'Times New Roman', serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  #scene { position: fixed; inset: 0; display: block; width: 100%; height: 100%; }
+
+  .ui {
+    position: fixed; inset: 0;
+    display: flex; flex-direction: column; align-items: center;
+    padding-top: clamp(14px, 3.1vh, 44px);
+    pointer-events: none;
+  }
+  h1 {
+    margin: 0; text-align: center;
+    font-size: clamp(30px, 5.4vw, 78px);
+    font-weight: 500; line-height: 1.05; letter-spacing: .11em;
+    color: #ecd9a0;
+    text-shadow: 0 0 28px rgba(236, 217, 160, .34), 0 0 70px rgba(236, 217, 160, .12);
+    white-space: nowrap;
+  }
+  .to {
+    margin: clamp(4px, .7vh, 12px) 0 0;
+    text-align: center;
+    font-size: clamp(15px, 1.8vw, 24px);
+    letter-spacing: .18em;
+    color: #e3ebf3;
+    text-shadow: 0 0 18px rgba(214, 231, 245, .32);
+    white-space: nowrap;
+  }
+  .hint {
+    position: fixed; left: 0; right: 0; bottom: clamp(12px, 2.4vh, 26px);
+    text-align: center;
+    font-size: clamp(10px, .95vw, 13px);
+    letter-spacing: .28em;
+    color: rgba(214, 229, 242, .52);
+    pointer-events: none;
+    white-space: nowrap;
+  }
+
+  /* text is visible by default; only a JS-enabled page fades it in */
+  html.js h1, html.js .to, html.js .hint { opacity: 0; }
+  html.js h1 { transform: translateY(-10px); transition: opacity 1.8s ease, transform 1.8s ease; }
+  html.js .to { transform: translateY(-6px); transition: opacity 1.6s ease .1s, transform 1.6s ease .1s; }
+  html.js .hint { transition: opacity 2s ease; }
+  html.js h1.on, html.js .to.on, html.js .hint.on { opacity: 1; transform: none; }
+
+  .noscript {
+    position: fixed; left: 0; right: 0; bottom: clamp(56px, 9vh, 96px);
+    padding: 0 24px;
+    text-align: center;
+    font-size: 13px; line-height: 1.5; letter-spacing: .04em;
+    color: rgba(214, 229, 242, .68);
+  }
+
+  @media (max-width: 560px) {
+    .hint { font-size: 9px; letter-spacing: .16em; }
+  }
+</style>
+</head>
+<body>
+<canvas id="scene"></canvas>
+
+<div class="ui">
+  <h1 id="title">Merry Christmas</h1>
+  <div class="to" id="to">谦谦</div>
+</div>
+<div class="hint" id="hint">move your cursor to spin the christmas tree</div>
+
+<noscript>
+  <div class="noscript">
+    This preview does not run JavaScript, so the particle tree cannot be drawn.<br>
+    Please open this file in Safari, Chrome, or any browser.
+  </div>
+</noscript>
+
+<script>
+(function () {
+  "use strict";
+
+  var TAU = Math.PI * 2;
+  var FOCAL = 2.4;
+
+  var canvas = document.getElementById("scene");
+  var ctx = canvas.getContext("2d");
+  var titleEl = document.getElementById("title");
+  var toEl = document.getElementById("to");
+  var hintEl = document.getElementById("hint");
+
+  function clamp01(v) { return v < 0 ? 0 : v > 1 ? 1 : v; }
+  function lerp(a, b, t) { return a + (b - a) * t; }
+  function easeOutCubic(t) { return 1 - Math.pow(1 - t, 3); }
+  function easeInOutCubic(t) { return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2; }
+
+  /* ---------------- glow sprites ---------------- */
+  var PALETTE = {
+    deep:   [128, 40, 76],
+    mid:    [186, 84, 126],
+    bright: [240, 142, 180],
+    lime:   [255, 198, 220],
+    amber:  [255, 226, 160],
+    gold:   [255, 208, 120],
+    pale:   [255, 238, 196],
+    snow:   [226, 238, 248]
+  };
+  var sprite = {};
+  (function buildSprites() {
+    var size = 64;
+    for (var k in PALETTE) {
+      var c = PALETTE[k], r = c[0], g = c[1], b = c[2];
+      var cv = document.createElement("canvas");
+      cv.width = cv.height = size;
+      var g2 = cv.getContext("2d");
+      var grd = g2.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
+      grd.addColorStop(0, "rgba(" + r + "," + g + "," + b + ",1)");
+      grd.addColorStop(0.16, "rgba(" + r + "," + g + "," + b + ",0.82)");
+      grd.addColorStop(0.42, "rgba(" + r + "," + g + "," + b + ",0.24)");
+      grd.addColorStop(1, "rgba(" + r + "," + g + "," + b + ",0)");
+      g2.fillStyle = grd;
+      g2.fillRect(0, 0, size, size);
+      sprite[k] = cv;
+    }
+  })();
+
+  /* ---------------- layout ---------------- */
+  var W = 0, H = 0, DPR = 1;
+  var cx = 0, groundY = 0, unit = 1;
+
+  function layout() {
+    DPR = Math.min(window.devicePixelRatio || 1, 2);
+    W = window.innerWidth;
+    H = window.innerHeight;
+    canvas.width = Math.floor(W * DPR);
+    canvas.height = Math.floor(H * DPR);
+    canvas.style.width = W + "px";
+    canvas.style.height = H + "px";
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+
+    cx = W / 2;
+    var toRect = toEl.getBoundingClientRect();
+    var hintRect = hintEl.getBoundingClientRect();
+    var topLimit = (toRect.height ? toRect.bottom : H * 0.2) + Math.max(26, H * 0.05);
+    var bottomLimit = (hintRect.height ? hintRect.top : H * 0.9) - Math.max(16, H * 0.03);
+    if (bottomLimit - topLimit < H * 0.4) {
+      topLimit = H * 0.22;
+      bottomLimit = H * 0.88;
+    }
+    groundY = bottomLimit;
+    unit = Math.max(120, (bottomLimit - topLimit) / 1.22);
+  }
+
+  /* ---------------- tree particles ---------------- */
+  var TREE = [];
+  function buildTree() {
+    TREE.length = 0;
+    var N = Math.round(Math.min(3200, Math.max(1500, (W * H) / 520)));
+    var arms = 7, turns = 6.2;
+    for (var i = 0; i < N; i++) {
+      var t = 1 - Math.pow(Math.random(), 0.7);       // 0 = base, 1 = tip
+      var fill = Math.random() < 0.24;
+      var arm = Math.floor(Math.random() * arms);
+      var theta = fill
+        ? Math.random() * TAU
+        : (arm / arms) * TAU + t * turns * TAU + (Math.random() - 0.5) * 0.42;
+      var rMax = 0.335 * Math.pow(1 - t, 0.92);
+      var rr = rMax * (fill ? 0.2 + Math.random() * 0.8 : 0.82 + Math.random() * 0.2);
+
+      var pick = Math.random(), key;
+      if (pick < 0.30) key = "mid";
+      else if (pick < 0.56) key = "bright";
+      else if (pick < 0.78) key = "deep";
+      else if (pick < 0.93) key = "lime";
+      else key = "amber";
+
+      // fly-in origin, scattered on a large shell around the tree
+      var R0 = 1.4 + Math.random() * 2.4;
+      var u = Math.random() * 2 - 1;
+      var ph = Math.random() * TAU;
+      var s2 = Math.sqrt(Math.max(0, 1 - u * u));
+
+      TREE.push({
+        x: Math.cos(theta) * rr,
+        y: t,
+        z: Math.sin(theta) * rr,
+        key: key,
+        size: 1.0 + Math.random() * 1.7,
+        ph: Math.random() * TAU,
+        sp: 0.6 + Math.random() * 1.6,
+        d: Math.random() * 0.42,
+        ox: R0 * s2 * Math.cos(ph) * 0.85,
+        oy: 0.45 + u * R0 * 0.55,
+        oz: R0 * s2 * Math.sin(ph) * 0.85
+      });
+    }
+  }
+
+  /* ---------------- golden helix strands ---------------- */
+  var STRANDS = [];
+  function buildStrands() {
+    STRANDS.length = 0;
+    var per = 460;
+    // two golden helices: counter-rotating, different radius + tone so the weave reads
+    var defs = [
+      { turns: 4.6, dir: 1, rf: 1.22, phase: 0, key: "gold" },
+      { turns: 4.6, dir: -1, rf: 1.10, phase: Math.PI * 0.35, key: "pale" }
+    ];
+    for (var s = 0; s < defs.length; s++) {
+      var def = defs[s];
+      var arr = [];
+      for (var i = 0; i < per; i++) {
+        var t = i / (per - 1);
+        var theta = def.phase + t * def.dir * def.turns * TAU;
+        var rMax = 0.335 * Math.pow(1 - t, 0.92);
+        var r = rMax * def.rf + 0.008;
+        arr.push({
+          t: t,
+          x: Math.cos(theta) * r,
+          y: t,
+          z: Math.sin(theta) * r,
+          ph: Math.random() * TAU,
+          size: 2.6 + Math.random() * 1.8,
+          key: def.key
+        });
+      }
+      STRANDS.push(arr);
+    }
+  }
+
+  /* ---------------- snow ---------------- */
+  var SNOW = [];
+  function buildSnow() {
+    SNOW.length = 0;
+    var n = Math.round(Math.min(240, Math.max(110, (W * H) / 9000)));
+    for (var i = 0; i < n; i++) {
+      SNOW.push({
+        x: Math.random() * W,
+        y: Math.random() * H,
+        r: 0.5 + Math.random() * 2.1,
+        vy: 14 + Math.random() * 42,
+        vx: -10 + Math.random() * 20,
+        ph: Math.random() * TAU,
+        a: 0.14 + Math.random() * 0.5,
+        z: 0.35 + Math.random() * 0.65
+      });
+    }
+  }
+
+  /* ---------------- projection ---------------- */
+  function project(x, y, z, rot) {
+    var cos = Math.cos(rot), sin = Math.sin(rot);
+    var rx = x * cos - z * sin;
+    var rz = x * sin + z * cos;
+    var persp = FOCAL / (FOCAL + rz);
+    return {
+      sx: cx + rx * unit * persp,
+      sy: groundY - y * unit * persp,
+      z: rz,
+      persp: persp
+    };
+  }
+
+  /* ---------------- drawing ---------------- */
+  function drawGround() {
+    var r = Math.max(unit * 0.45, 220);
+    var g = ctx.createRadialGradient(cx, groundY, 0, cx, groundY, r);
+    g.addColorStop(0, "rgba(214,130,176,0.15)");
+    g.addColorStop(0.45, "rgba(120,50,88,0.06)");
+    g.addColorStop(1, "rgba(0,0,0,0)");
+    ctx.globalCompositeOperation = "lighter";
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.ellipse(cx, groundY, r, r * 0.30, 0, 0, TAU);
+    ctx.fill();
+  }
+
+  function drawTree(now, introP, rot) {
+    ctx.globalCompositeOperation = "lighter";
+    for (var i = 0; i < TREE.length; i++) {
+      var p = TREE[i];
+      var pp = 1;
+      if (introP < 1) pp = easeInOutCubic(clamp01((introP - p.d) / (1 - p.d * 0.85)));
+
+      var x = p.x, y = p.y, z = p.z;
+      if (pp < 1) {
+        x = lerp(p.ox, p.x, pp);
+        y = lerp(p.oy, p.y, pp);
+        z = lerp(p.oz, p.z, pp);
+      }
+      var pr = project(x, y, z, rot);
+      var depthA = 0.34 + 0.66 * clamp01((pr.z + 0.36) / 0.72);
+      var tw = 0.62 + 0.38 * Math.sin(now * 0.0016 * p.sp + p.ph);
+      var a = clamp01(depthA * tw * (0.3 + 0.7 * pp) * 0.88);
+      if (a <= 0.012) continue;
+
+      var size = p.size * (0.9 + 0.25 * pr.persp) * (0.55 + 0.6 * pp);
+      var rad = size * 3.3;
+      ctx.globalAlpha = a;
+      ctx.drawImage(sprite[p.key], pr.sx - rad, pr.sy - rad, rad * 2, rad * 2);
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  function drawStrands(now, reveal, rot) {
+    if (reveal <= 0.001) return;
+    ctx.globalCompositeOperation = "lighter";
+    var head = reveal;
+    for (var s = 0; s < STRANDS.length; s++) {
+      var arr = STRANDS[s];
+      for (var i = 0; i < arr.length; i++) {
+        var p = arr[i];
+        if (p.t > reveal * 1.01) continue;
+        var near = Math.exp(-Math.pow((p.t - head) * 15, 2));
+        var pr = project(p.x, p.y, p.z, rot);
+        var depthA = 0.5 + 0.5 * clamp01((pr.z + 0.36) / 0.72);
+        var tw = 0.76 + 0.24 * Math.sin(now * 0.003 + p.ph);
+        var a = clamp01((0.58 + 0.42 * near) * depthA * tw);
+        var rad = p.size * (0.9 + 0.3 * pr.persp) * (1 + 0.85 * near);
+        ctx.globalAlpha = a;
+        ctx.drawImage(sprite[p.key], pr.sx - rad * 1.35, pr.sy - rad * 1.35, rad * 2.7, rad * 2.7);
+      }
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  function drawStar(now, pop) {
+    if (pop <= 0.001) return;
+    var pr = project(0, 1.045, 0, 0);
+    var pulse = 0.84 + 0.16 * Math.sin(now * 0.0055);
+    var R = unit * 0.058 * (0.5 + 0.5 * pop) * pulse;
+    if (R < 1) return;
+
+    ctx.globalCompositeOperation = "lighter";
+
+    // halo (kept tight so it never reaches the headline above)
+    var halo = R * 2.3;
+    var g = ctx.createRadialGradient(pr.sx, pr.sy, 0, pr.sx, pr.sy, halo);
+    g.addColorStop(0, "rgba(255,244,208,0.95)");
+    g.addColorStop(0.26, "rgba(255,216,134,0.38)");
+    g.addColorStop(1, "rgba(255,200,110,0)");
+    ctx.globalAlpha = 0.9 * pop;
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.arc(pr.sx, pr.sy, halo, 0, TAU);
+    ctx.fill();
+
+    // flat sparkling star, spinning about its own centre axis
+    ctx.save();
+    ctx.translate(pr.sx, pr.sy);
+    ctx.rotate(now * 0.0011);
+    ctx.globalAlpha = 0.95 * pop;
+    ctx.fillStyle = "rgba(255,236,182,0.95)";
+    starPath(R, R * 0.26, 4);
+    ctx.fill();
+    ctx.fillStyle = "rgba(255,248,222,1)";
+    starPath(R * 0.5, R * 0.5, 4);
+    ctx.fill();
+    ctx.restore();
+
+    // flares: wide horizontal, short upward, longer downward
+    ctx.globalAlpha = 0.42 * pop * (0.7 + 0.3 * Math.sin(now * 0.004));
+    var fg = ctx.createLinearGradient(pr.sx - R * 3.0, pr.sy, pr.sx + R * 3.0, pr.sy);
+    fg.addColorStop(0, "rgba(255,226,150,0)");
+    fg.addColorStop(0.5, "rgba(255,236,190,0.85)");
+    fg.addColorStop(1, "rgba(255,226,150,0)");
+    ctx.strokeStyle = fg;
+    ctx.lineWidth = Math.max(1, R * 0.09);
+    ctx.beginPath();
+    ctx.moveTo(pr.sx - R * 3.0, pr.sy);
+    ctx.lineTo(pr.sx + R * 3.0, pr.sy);
+    ctx.stroke();
+
+    var vg = ctx.createLinearGradient(pr.sx, pr.sy - R * 0.9, pr.sx, pr.sy + R * 1.8);
+    vg.addColorStop(0, "rgba(255,226,150,0)");
+    vg.addColorStop(0.4, "rgba(255,236,190,0.8)");
+    vg.addColorStop(1, "rgba(255,226,150,0)");
+    ctx.strokeStyle = vg;
+    ctx.beginPath();
+    ctx.moveTo(pr.sx, pr.sy - R * 0.9);
+    ctx.lineTo(pr.sx, pr.sy + R * 1.8);
+    ctx.stroke();
+
+    ctx.globalAlpha = 1;
+  }
+
+  function starPath(R, inner, points) {
+    ctx.beginPath();
+    for (var i = 0; i < points * 2; i++) {
+      var ang = (i * Math.PI) / points - Math.PI / 2;
+      var rad = (i % 2 === 0) ? R : inner;
+      var px = Math.cos(ang) * rad;
+      var py = Math.sin(ang) * rad;
+      if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+    }
+    ctx.closePath();
+  }
+
+  function drawSnow(dt, now) {
+    ctx.globalCompositeOperation = "lighter";
+    for (var i = 0; i < SNOW.length; i++) {
+      var f = SNOW[i];
+      f.y += (f.vy * f.z) * (dt / 1000);
+      f.x += (f.vx + Math.sin(now * 0.0007 + f.ph) * 9) * (dt / 1000) * f.z;
+      if (f.y - f.r > H) { f.y = -f.r * 3; f.x = Math.random() * W; }
+      if (f.x < -20) f.x = W + 20;
+      if (f.x > W + 20) f.x = -20;
+
+      var rad = f.r * 3.1 * f.z;
+      ctx.globalAlpha = clamp01(f.a * f.z);
+      ctx.drawImage(sprite.snow, f.x - rad, f.y - rad, rad * 2, rad * 2);
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  /* ---------------- interaction ---------------- */
+  var allowMouse = false;
+  var mouseSpin = 0, mouseSpinTarget = 0;
+
+  window.addEventListener("pointermove", function (e) {
+    if (!allowMouse) return;
+    var nx = clamp01(e.clientX / Math.max(1, W));
+    mouseSpinTarget = (nx - 0.5) * Math.PI * 1.9;
+  }, { passive: true });
+
+  /* ---------------- loop ---------------- */
+  var t0 = 0, lastT = 0;
+
+  function frame(now) {
+    if (!t0) t0 = now;
+    var t = now - t0;
+    var dt = lastT ? Math.min(64, now - lastT) : 16;
+    lastT = now;
+
+    var introRaw = clamp01((t - 500) / 4300);
+    var introP = easeInOutCubic(introRaw);
+    var introAngle = -TAU * (1 - easeInOutCubic(introRaw));
+    var reveal = easeInOutCubic(clamp01((t - 4200) / 2500));
+    var starPop = easeOutCubic(clamp01((t - 5900) / 1000));
+
+    if (introRaw >= 1) allowMouse = true;
+    if (allowMouse) mouseSpin += (mouseSpinTarget - mouseSpin) * Math.min(1, dt * 0.0065);
+    var rot = introAngle + mouseSpin;
+
+    ctx.clearRect(0, 0, W, H);
+    drawGround();
+    drawTree(t, introP, rot);
+    drawStrands(t, reveal, rot);
+    drawStar(t, starPop);
+    drawSnow(dt, t);
+
+    requestAnimationFrame(frame);
+  }
+
+  function boot() {
+    layout();
+    buildTree();
+    buildStrands();
+    buildSnow();
+
+    // phones have no cursor: swap the hint for a touch instruction
+    var touchOnly = ("ontouchstart" in window) ||
+                    (navigator.maxTouchPoints && navigator.maxTouchPoints > 0) ||
+                    (window.matchMedia && window.matchMedia("(hover: none)").matches);
+    if (touchOnly) hintEl.textContent = "swipe to spin the christmas tree";
+
+    requestAnimationFrame(frame);
+
+    window.setTimeout(function () { titleEl.classList.add("on"); }, 1400);
+    window.setTimeout(function () { toEl.classList.add("on"); }, 2200);
+    window.setTimeout(function () { hintEl.classList.add("on"); }, 3450);
+  }
+
+  var resizeTimer = 0;
+  window.addEventListener("resize", function () {
+    window.clearTimeout(resizeTimer);
+    resizeTimer = window.setTimeout(function () {
+      layout();
+      buildSnow();
+    }, 120);
+  });
+
+  if (document.fonts && document.fonts.ready) {
+    document.fonts.ready.then(function () { layout(); });
+  }
+  window.setTimeout(layout, 400);
+  window.addEventListener("load", layout);
+
+  boot();
+})();
+</script>
+</body>
+</html>
